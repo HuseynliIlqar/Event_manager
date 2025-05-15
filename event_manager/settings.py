@@ -29,6 +29,7 @@ INSTALLED_APPS = [
 
     # Local apps
     'auth_system',
+    'tickets',
 
     # Third-party libraries
     'rest_framework',
