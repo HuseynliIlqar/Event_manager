@@ -3,7 +3,6 @@ from jwt.utils import force_bytes
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
-from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes
@@ -12,7 +11,22 @@ from django.conf import settings
 from django.core.mail import BadHeaderError
 from smtplib import SMTPException
 from auth_system.models import Profile
+from .models import SellerApplication
 
+
+
+class SellerApplicationSerializer(serializers.ModelSerializer):
+    store_name = serializers.CharField(max_length=100, required=True)
+    phone = serializers.CharField(max_length=20, required=True)
+    description = serializers.CharField(max_length=150, required=True)
+
+    class Meta:
+        model  = SellerApplication
+        fields = ['store_name', 'phone', 'description']
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        return SellerApplication.objects.create(user=user, **validated_data)
 
 class RegisterSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
@@ -63,30 +77,22 @@ class RegisterSerializer(serializers.Serializer):
         return user
 
 class LoginSerializer(serializers.Serializer):
-    username = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
-        username = attrs.get('username')
+        email = attrs.get('email')
         password = attrs.get('password')
 
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist:
-            raise serializers.ValidationError("İstifadəçi adı və ya parol yanlışdır.")
-
-        if not user.is_active:
-            raise serializers.ValidationError("Hesab aktiv deyil. Zəhmət olmasa emailinizi təsdiqləyin.")
-
-        user = authenticate(username=username, password=password)
-
+        # authenticate çağıranda bizim EmailBackend də işləyəcək
+        user = authenticate(
+            request=self.context.get('request'),
+            username=email,       # burada email istifadə olunur
+            password=password
+        )
         if not user:
-            raise serializers.ValidationError("İstifadəçi adı və ya parol yanlışdır.")
-
-        refresh = RefreshToken.for_user(user)
+            raise serializers.ValidationError("Email və ya şifrə yalnışdır")
         attrs['user'] = user
-        attrs['token'] = str(refresh.access_token)
-        attrs['refresh_token'] = str(refresh)
         return attrs
 
 class LogoutSerializer(serializers.Serializer):
@@ -179,3 +185,4 @@ class SetNewPasswordSerializer(serializers.Serializer):
         user.set_password(self.validated_data['new_password'])
         user.save()
         return user
+

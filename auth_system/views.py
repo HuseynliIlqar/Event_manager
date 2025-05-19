@@ -1,4 +1,5 @@
 from rest_framework.views import APIView
+from django.conf import settings
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
@@ -6,9 +7,56 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth.models import User
+from rest_framework.authtoken.models import Token
+from django.core.mail import mail_admins, send_mail
+from django.template.loader import render_to_string
+from .models import SellerApplication
 from .serializers import RegisterSerializer, LoginSerializer, LogoutSerializer, PasswordChangeSerializer, \
-    PasswordResetSerializer, SetNewPasswordSerializer
+    PasswordResetSerializer, SetNewPasswordSerializer,SellerApplicationSerializer
 
+class SellerApplicationAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if SellerApplication.objects.filter(user=request.user).exists():
+            return Response(
+                {'detail': 'Siz artıq müraciət etmisiniz.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = SellerApplicationSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        app = serializer.save()
+
+        subject = f"Yeni seller müraciəti: {request.user.username}"
+        message = (
+            f"Yeni seller müraciəti alındı:\n\n"
+            f"İstifadəçi: {request.user.username} ({request.user.email})\n"
+            f"Mağaza adı: {app.store_name}\n"
+            f"Telefon: {app.phone}\n"
+            f"Açıqlama: {app.description}\n"
+            # f"Qısa təsvir: {getattr(app, 'description', '—')}\n"
+            f"Müraciət vaxtı: {app.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        )
+
+
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [settings.ADMIN_EMAIL],
+            fail_silently=False
+        )
+
+        return Response(
+            {'detail': 'Müraciətiniz alındı və adminə göndərildi.'},
+            status=status.HTTP_201_CREATED
+        )
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
@@ -23,17 +71,20 @@ class LoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        serializer = LoginSerializer(data=request.data)
+        serializer = LoginSerializer(
+            data=request.data,
+            context={'request': request}
+        )
         serializer.is_valid(raise_exception=True)
-
         user = serializer.validated_data['user']
-        token = serializer.validated_data['token']
-        refresh_token = serializer.validated_data['refresh_token']
+
+
+        refresh = RefreshToken.for_user(user)
+        access_token = refresh.access_token
 
         return Response({
-            'message': f'Xoş gəldiniz, {user.username}!',
-            'token': token,
-            'refresh_token': refresh_token
+            'access': str(access_token),
+            'refresh': str(refresh),
         }, status=status.HTTP_200_OK)
 
 class LogoutView(APIView):

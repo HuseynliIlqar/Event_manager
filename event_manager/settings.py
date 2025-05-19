@@ -17,6 +17,7 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -88,13 +89,21 @@ REST_FRAMEWORK = {
     ),
 }
 
+AUTHENTICATION_BACKENDS = [
+    'auth_system.backends.EmailBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'huseynliilqarr@gmail.com'
+
+ADMIN_EMAIL = 'huseynilqarr@gmail.com'
+DEFAULT_FROM_EMAIL = 'huseynilqarr@gmail.com'
+EMAIL_BACKEND    = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST       = 'smtp.gmail.com'
+EMAIL_PORT       = 587
+EMAIL_HOST_USER  = 'huseynliilqarr@gmail.com'
 EMAIL_HOST_PASSWORD = 'mmym otcw tebc rjmj'
+EMAIL_USE_TLS    = True
+
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
