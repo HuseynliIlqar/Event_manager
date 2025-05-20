@@ -87,7 +87,7 @@ class LoginSerializer(serializers.Serializer):
         # authenticate çağıranda bizim EmailBackend də işləyəcək
         user = authenticate(
             request=self.context.get('request'),
-            username=email,       # burada email istifadə olunur
+            username=email,
             password=password
         )
         if not user:
