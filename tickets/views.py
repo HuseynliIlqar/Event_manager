@@ -1,6 +1,8 @@
+import uuid
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, NotFound
+from rest_framework.views import APIView
 from .models import Ticket, Event
 from .serializers import TicketSerializer, EventSerializer
 
@@ -134,3 +136,76 @@ class TicketViewSet(viewsets.ModelViewSet):
             raise NotFound("Ticket not found.")
         ticket.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TicketCheckView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        # Əvvəlcə URL-dən partyamıza diqqət edək:
+        # urls.py-də belə qeyd olunub: path('tickets/<str:ticket_id>/check/', ...)
+        ticket_id = kwargs.get('ticket_id')  # URL-dən əldə edirik
+
+        if not ticket_id:
+            return Response(
+                {"error": "URL parametrində ticket_id daxil edilməlidir."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 1. Ticket-in özü mövcuddurmu, yoxlayırıq
+        try:
+            ticket = Ticket.objects.get(ticket_id=ticket_id)
+        except Ticket.DoesNotExist:
+            return Response(
+                {"error": "Bilet tapılmadı və ya mövcud deyil."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # 2. Əgər bilet artıq istifadə olunubsa: is_used=True
+        if ticket.is_used:
+            return Response(
+                {"error": "Bu bilet artıq istifadə olunub."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 3. Ödənişə baxaq: Payment-də həmin event + həmin kullanıcı üçün başarılı bir ödəniş varmı?
+        #    Burada ticket.event və ticket.customer əlaqələrinə baxırıq.
+        #    İstifadəçi “customer” kimi bileti satın almış olmalıdır.
+        customer = ticket.customer
+        event = ticket.event
+
+        if not customer:
+            # Hələ heç kim bileti almayıbsa, `customer=None` gələ bilər.
+            return Response(
+                {"error": "Bu bilet hələ satın alınmayıb."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Payment obyektində filter-ləyirik:
+        try:
+            payment = Payment.objects.filter(
+                event=event,
+                user=customer,
+                is_successful=True
+            ).first()
+        except Payment.DoesNotExist:
+            payment = None
+
+        if not payment:
+            return Response(
+                {"error": "Bu bilet üçün uğurlu ödəniş tapılmadı."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 4. Ticket.is_paid yoxsa, indi “ödəmə var” dediyimiz üçün güncəlləyək
+        if not ticket.is_paid:
+            ticket.is_paid = True
+            ticket.save()
+
+        # 5. İndi biletin vəziyyətini geri qaytaraq. Eyni zamanda, is_used=True olaraq qeyd edə bilərik.
+        #    Əgər istəyirsinizsə, yoxlama anında bileti “istifadə olundu” kimi işarələmək üçün:
+        ticket.is_used = True
+        ticket.save()
+
+        serializer = TicketSerializer(ticket)
+        return Response(serializer.data, status=status.HTTP_200_OK)
