@@ -1,19 +1,91 @@
 import uuid
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, filters
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, NotFound
+from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.views import APIView
-from .models import Ticket, Event
+from rest_framework.permissions import IsAuthenticated
+from django.db.models import Q
+from .models import Ticket, Event, EventCategory
 from .serializers import TicketSerializer, EventSerializer
+from datetime import datetime
 
 
 class EventViewSet(viewsets.ModelViewSet):
     queryset = Event.objects.all()
     serializer_class = EventSerializer
     permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'description', 'location']
+    ordering_fields = ['start_time', 'price', 'created_at']
 
     def get_queryset(self):
-        return self.queryset.filter(organizer=self.request.user)
+        queryset = Event.objects.filter(is_active=True)
+        
+        # Axtarış parametrləri
+        query = self.request.query_params.get('q', '')
+        category = self.request.query_params.get('category', '')
+        min_price = self.request.query_params.get('min_price', '')
+        max_price = self.request.query_params.get('max_price', '')
+        date_from = self.request.query_params.get('date_from', '')
+        date_to = self.request.query_params.get('date_to', '')
+        location = self.request.query_params.get('location', '')
+
+        # Mətn axtarışı
+        if query:
+            queryset = queryset.filter(
+                Q(name__icontains=query) |
+                Q(description__icontains=query)
+            )
+
+        # Kateqoriyaya görə filtirləmə
+        if category:
+            queryset = queryset.filter(category__name__iexact=category)
+
+        # Qiymət aralığına görə filtirləmə
+        if min_price:
+            queryset = queryset.filter(price__gte=min_price)
+        if max_price:
+            queryset = queryset.filter(price__lte=max_price)
+
+        # Tarix aralığına görə filtirləmə
+        if date_from:
+            try:
+                date_from = datetime.strptime(date_from, '%Y-%m-%d')
+                queryset = queryset.filter(start_time__gte=date_from)
+            except ValueError:
+                pass
+
+        if date_to:
+            try:
+                date_to = datetime.strptime(date_to, '%Y-%m-%d')
+                queryset = queryset.filter(end_time__lte=date_to)
+            except ValueError:
+                pass
+
+        # Yerə görə filtirləmə
+        if location:
+            queryset = queryset.filter(location__icontains=location)
+
+        return queryset
+
+    @action(detail=False, methods=['get'])
+    def search(self, request):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({
+            'count': queryset.count(),
+            'results': serializer.data
+        })
+
+    @action(detail=False, methods=['get'])
+    def categories(self, request):
+        categories = EventCategory.objects.all()
+        return Response([{
+            'id': category.id,
+            'name': category.name,
+            'description': category.description
+        } for category in categories])
 
     def list(self, request):
         queryset = self.get_queryset()
@@ -138,13 +210,12 @@ class TicketViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class TicketCheckView(APIView):
+class TicketCheckViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
-    def post(self, request, *args, **kwargs):
-        # Əvvəlcə URL-dən partyamıza diqqət edək:
-        # urls.py-də belə qeyd olunub: path('tickets/<str:ticket_id>/check/', ...)
-        ticket_id = kwargs.get('ticket_id')  # URL-dən əldə edirik
+    @action(detail=True, methods=['post'])
+    def check(self, request, pk=None):
+        ticket_id = pk
 
         if not ticket_id:
             return Response(
@@ -152,7 +223,6 @@ class TicketCheckView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # 1. Ticket-in özü mövcuddurmu, yoxlayırıq
         try:
             ticket = Ticket.objects.get(ticket_id=ticket_id)
         except Ticket.DoesNotExist:
@@ -161,27 +231,21 @@ class TicketCheckView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # 2. Əgər bilet artıq istifadə olunubsa: is_used=True
         if ticket.is_used:
             return Response(
                 {"error": "Bu bilet artıq istifadə olunub."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # 3. Ödənişə baxaq: Payment-də həmin event + həmin kullanıcı üçün başarılı bir ödəniş varmı?
-        #    Burada ticket.event və ticket.customer əlaqələrinə baxırıq.
-        #    İstifadəçi “customer” kimi bileti satın almış olmalıdır.
         customer = ticket.customer
         event = ticket.event
 
         if not customer:
-            # Hələ heç kim bileti almayıbsa, `customer=None` gələ bilər.
             return Response(
                 {"error": "Bu bilet hələ satın alınmayıb."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Payment obyektində filter-ləyirik:
         try:
             payment = Payment.objects.filter(
                 event=event,
@@ -197,13 +261,10 @@ class TicketCheckView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # 4. Ticket.is_paid yoxsa, indi “ödəmə var” dediyimiz üçün güncəlləyək
         if not ticket.is_paid:
             ticket.is_paid = True
             ticket.save()
 
-        # 5. İndi biletin vəziyyətini geri qaytaraq. Eyni zamanda, is_used=True olaraq qeyd edə bilərik.
-        #    Əgər istəyirsinizsə, yoxlama anında bileti “istifadə olundu” kimi işarələmək üçün:
         ticket.is_used = True
         ticket.save()
 
