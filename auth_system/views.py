@@ -1,74 +1,95 @@
-from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework_simplejwt.tokens import RefreshToken
+from django.conf import settings
+from django.contrib.auth.models import User
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
-from django.contrib.auth.models import User
-from .serializers import RegisterSerializer, LoginSerializer, LogoutSerializer, PasswordChangeSerializer, \
-    PasswordResetSerializer, SetNewPasswordSerializer
+from rest_framework import viewsets, status, serializers
+from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.core.mail import send_mail
+from .models import SellerApplication
+from .serializers import (
+    SellerApplicationSerializer,
+    RegisterSerializer, LoginSerializer, LogoutSerializer,
+    PasswordChangeSerializer, PasswordResetSerializer, SetNewPasswordSerializer
+)
 
 
-class RegisterView(APIView):
+class SellerApplicationViewSet(viewsets.ModelViewSet):
+    queryset = SellerApplication.objects.all()
+    serializer_class = SellerApplicationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return self.queryset.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        if SellerApplication.objects.filter(user=self.request.user).exists():
+            raise serializers.ValidationError("Siz artıq müraciət etmisiniz.")
+        app = serializer.save(user=self.request.user)
+
+        subject = f"Yeni seller müraciəti: {self.request.user.username}"
+        message = (
+            f"Yeni seller müraciəti alındı:\n\n"
+            f"İstifadəçi: {self.request.user.username} ({self.request.user.email})\n"
+            f"Mağaza adı: {app.store_name}\n"
+            f"Telefon: {app.phone}\n"
+            f"Açıqlama: {app.description}\n"
+            f"Müraciət vaxtı: {app.created_at:%Y-%m-%d %H:%M:%S}\n"
+        )
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [settings.ADMIN_EMAIL],
+            fail_silently=False
+        )
+
+
+class UserViewSet(viewsets.GenericViewSet):
+    queryset = User.objects.all()
     permission_classes = [AllowAny]
 
-    def post(self, request):
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def register(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response({'message': 'Registration successful'}, status=status.HTTP_201_CREATED)
+        return Response({'detail': 'Qeydiyyat uğurla tamamlandı.'}, status=status.HTTP_201_CREATED)
 
-class LoginView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        serializer = LoginSerializer(data=request.data)
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def login(self, request):
+        serializer = LoginSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
-
         user = serializer.validated_data['user']
-        token = serializer.validated_data['token']
-        refresh_token = serializer.validated_data['refresh_token']
-
+        refresh = RefreshToken.for_user(user)
         return Response({
-            'message': f'Xoş gəldiniz, {user.username}!',
-            'token': token,
-            'refresh_token': refresh_token
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
         }, status=status.HTTP_200_OK)
 
-class LogoutView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def logout(self, request):
         serializer = LogoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        refresh_token = serializer.validated_data['refresh_token']
+        RefreshToken(refresh_token).blacklist()
+        return Response({'detail': 'Çıxış uğurla edildi.'}, status=status.HTTP_205_RESET_CONTENT)
 
-        try:
-            refresh_token = serializer.validated_data["refresh_token"]
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-
-            return Response({"detail": "Successfully logged out."}, status=status.HTTP_205_RESET_CONTENT)
-        except Exception:
-            return Response({"detail": "Logout failed."}, status=status.HTTP_400_BAD_REQUEST)
-
-class PasswordChangeView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def put(self, request):
+    @action(detail=False, methods=['put'], permission_classes=[IsAuthenticated], url_path='change-password')
+    def change_password(self, request):
         serializer = PasswordChangeSerializer(data=request.data, context={'request': request})
-        if serializer.is_valid():
-            user = request.user
-            new_password = serializer.validated_data.get('new_password')
-            user.set_password(new_password)
-            user.save()
-            return Response({"detail": "Parol uğurla dəyişdirildi!"}, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
+        request.user.set_password(serializer.validated_data['new_password'])
+        request.user.save()
+        return Response({'detail': 'Parol uğurla dəyişdirildi!'}, status=status.HTTP_200_OK)
 
-class ActivateAccountView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request, uidb64, token):
+    @action(
+        detail=False, methods=['get'], permission_classes=[AllowAny],
+        url_path=r'activate/(?P<uidb64>[^/.]+)/(?P<token>[^/.]+)'
+    )
+    def activate(self, request, uidb64=None, token=None):
         try:
             uid = urlsafe_base64_decode(uidb64).decode()
             user = User.objects.get(pk=uid)
@@ -84,29 +105,23 @@ class ActivateAccountView(APIView):
             user.save()
             return Response({'detail': 'Hesab uğurla aktivləşdirildi.'}, status=status.HTTP_200_OK)
         else:
-            return Response({'detail': 'Token etibarsızdır və ya vaxtı keçmişdir.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'Token etibarsızdır və ya vaxtı keçmişdir.'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-class PasswordResetRequestView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], url_path='password-reset')
+    def password_reset(self, request):
         serializer = PasswordResetSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response({"detail": "Şifrəni sıfırlama linki email ünvanınıza göndərildi."},
-                        status=status.HTTP_200_OK)
+        return Response({'detail': 'Şifrə sıfırlama linki göndərildi.'}, status=status.HTTP_200_OK)
 
-class PasswordResetConfirmView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request, uidb64, token):
-        data = {
-            'uidb64': uidb64,
-            'token': token,
-            **request.data
-        }
+    @action(
+        detail=False, methods=['post'], permission_classes=[AllowAny],
+        url_path=r'password-reset-confirm/(?P<uidb64>[^/.]+)/(?P<token>[^/.]+)'
+    )
+    def password_reset_confirm(self, request, uidb64=None, token=None):
+        data = {'uidb64': uidb64, 'token': token, **request.data}
         serializer = SetNewPasswordSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response({"detail": "Şifrə uğurla yeniləndi."},
-                        status=status.HTTP_200_OK)
+        return Response({'detail': 'Şifrə uğurla yeniləndi.'}, status=status.HTTP_200_OK)
