@@ -1,0 +1,4 @@
+.venv
+myenv
+db.sqlite3
+venv
