@@ -7,6 +7,7 @@ class EventCategorySerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class EventSerializer(serializers.ModelSerializer):
+    organizer = serializers.PrimaryKeyRelatedField(read_only=True)
     category = EventCategorySerializer(read_only=True)
     category_id = serializers.PrimaryKeyRelatedField(
         queryset=EventCategory.objects.all(),

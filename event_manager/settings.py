@@ -16,6 +16,8 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+#Payment url
+PAYMENT_SERVICE_URL = "http://localhost:8001"
 
 
 # Application definition

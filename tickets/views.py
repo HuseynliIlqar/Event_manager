@@ -10,7 +10,6 @@ from .models import Ticket, Event, EventCategory
 from .serializers import TicketSerializer, EventSerializer
 from datetime import datetime
 
-
 class EventViewSet(viewsets.ModelViewSet):
     queryset = Event.objects.all()
     serializer_class = EventSerializer
@@ -139,7 +138,6 @@ class EventViewSet(viewsets.ModelViewSet):
         event.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-
 class TicketViewSet(viewsets.ModelViewSet):
     queryset = Ticket.objects.all()
     serializer_class = TicketSerializer
@@ -209,7 +207,6 @@ class TicketViewSet(viewsets.ModelViewSet):
         ticket.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-
 class TicketCheckViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -270,3 +267,48 @@ class TicketCheckViewSet(viewsets.ViewSet):
 
         serializer = TicketSerializer(ticket)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class TicketPurchaseAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, ticket_id):
+        # 1. Mövcud bileti tap
+        ticket = get_object_or_404(Ticket, ticket_id=ticket_id)
+
+        # 2. Əgər artıq alınıbsa
+        if ticket.customer:
+            return Response({"error": "Bu bilet artıq alınıb."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 3. Payment sisteminə məlumat göndər
+        payment_api_url = "http://payment-system/api/payments/"  # <- bunu real payment URL ilə əvəz et
+        payload = {
+            "user_id": request.user.id,
+            "event_id": ticket.event.id,
+            "ticket_id": ticket.ticket_id,
+            "amount": float(ticket.price)
+        }
+
+        try:
+            payment_response = requests.post(payment_api_url, json=payload)
+            payment_data = payment_response.json()
+        except Exception as e:
+            return Response({"error": "Ödəniş sistemi ilə əlaqə qurulmadı.", "details": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        # 4. Ödəniş nəticəsinə bax
+        if payment_response.status_code == 200 and payment_data.get("status") == "success":
+            ticket.customer = request.user
+            ticket.is_paid = True
+            ticket.is_confirmed = True  # əgər belə bir sahə varsa
+            ticket.save()
+            serializer = TicketSerializer(ticket)
+            return Response({
+                "message": "Biletiniz təsdiqləndi.",
+                "ticket": serializer.data
+            }, status=status.HTTP_200_OK)
+
+        return Response({
+            "error": "Ödəniş uğursuz oldu.",
+            "payment_status": payment_data.get("status"),
+            "details": payment_data.get("message", "")
+        }, status=status.HTTP_400_BAD_REQUEST)

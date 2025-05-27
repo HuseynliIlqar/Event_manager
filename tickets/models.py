@@ -28,7 +28,7 @@ class Event(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(_('Name'), max_length=255)
     description = models.TextField(_('Description'), blank=True)
-    category = models.ForeignKey(EventCategory, on_delete=models.SET_NULL, null=True, related_name='events')
+    category = models.ForeignKey(EventCategory, on_delete=models.PROTECT, related_name='events')
     location = models.CharField(_('Location'), max_length=255)
     start_time = models.DateTimeField(_('Start Time'))
     end_time = models.DateTimeField(_('End Time'))
@@ -48,6 +48,7 @@ class Event(models.Model):
         verbose_name_plural = _('Events')
         ordering = ['-start_time']
 
+
 class Ticket(models.Model):
     ticket_id = models.CharField(max_length=50, unique=True)
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='tickets')
@@ -65,6 +66,11 @@ class Ticket(models.Model):
     is_paid = models.BooleanField(default=False)
     is_used = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.ticket_id:
+            self.ticket_id = str(uuid.uuid4()).replace('-', '')[:12].upper()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.ticket_id} - {self.event.name} ({self.get_ticket_type_display()})"
