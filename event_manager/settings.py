@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     # Local apps
     'auth_system',
     'tickets',
+    'payments',
 
     # Third-party libraries
     'rest_framework',

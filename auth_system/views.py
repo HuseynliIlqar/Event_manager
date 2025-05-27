@@ -8,6 +8,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.mail import send_mail
+
 from .models import SellerApplication
 from .serializers import (
     SellerApplicationSerializer,
@@ -27,7 +28,8 @@ class SellerApplicationViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         if SellerApplication.objects.filter(user=self.request.user).exists():
             raise serializers.ValidationError("Siz artıq müraciət etmisiniz.")
-        app = serializer.save(user=self.request.user)
+
+        app = serializer.save()
 
         subject = f"Yeni seller müraciəti: {self.request.user.username}"
         message = (
@@ -73,8 +75,7 @@ class UserViewSet(viewsets.GenericViewSet):
     def logout(self, request):
         serializer = LogoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        refresh_token = serializer.validated_data['refresh_token']
-        RefreshToken(refresh_token).blacklist()
+        RefreshToken(serializer.validated_data['refresh_token']).blacklist()
         return Response({'detail': 'Çıxış uğurla edildi.'}, status=status.HTTP_205_RESET_CONTENT)
 
     @action(detail=False, methods=['put'], permission_classes=[IsAuthenticated], url_path='change-password')

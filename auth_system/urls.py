@@ -10,6 +10,8 @@ urlpatterns = [
     path('', include(router.urls)),
 ]
 
+
+"""
 # Aşağıdakı endpointlər avtomatik yaradılır:
 
 # -------------------------------------------------------------------
@@ -44,3 +46,4 @@ urlpatterns = [
 # /auth/password-reset-confirm/{uidb64}/{token}/  # UserViewSet.password_reset_confirm
 #   POST   → linkdəki token və uid əsasında yeni şifrə təyin edir
 # -------------------------------------------------------------------
+"""

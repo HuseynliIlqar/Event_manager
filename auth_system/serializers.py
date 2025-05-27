@@ -12,15 +12,20 @@ from .models import SellerApplication
 
 
 class SellerApplicationSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(read_only=True)
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    description = serializers.CharField(
+        max_length=500,
+        help_text="Mağaza haqqında qısa məlumat verin.",
+        required=True,
+        allow_blank=False,
+    )
+
     class Meta:
         model = SellerApplication
-        fields = ['store_name', 'phone', 'description']
+        fields = ['store_name', 'phone', 'description', 'user', 'id']
 
-    def create(self, validated_data):
-        return SellerApplication.objects.create(
-            user=self.context['request'].user,
-            **validated_data
-        )
+
 
 
 class RegisterSerializer(serializers.Serializer):

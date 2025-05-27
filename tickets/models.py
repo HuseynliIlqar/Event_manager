@@ -21,8 +21,6 @@ class EventCategory(models.Model):
     def __str__(self):
         return self.name
 
-    class Meta:
-        verbose_name_plural = "Event Categories"
 
 class Event(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
