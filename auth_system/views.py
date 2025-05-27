@@ -8,14 +8,12 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.mail import send_mail
-
 from .models import SellerApplication
 from .serializers import (
     SellerApplicationSerializer,
     RegisterSerializer, LoginSerializer, LogoutSerializer,
     PasswordChangeSerializer, PasswordResetSerializer, SetNewPasswordSerializer
 )
-
 
 class SellerApplicationViewSet(viewsets.ModelViewSet):
     queryset = SellerApplication.objects.all()
@@ -47,7 +45,6 @@ class SellerApplicationViewSet(viewsets.ModelViewSet):
             [settings.ADMIN_EMAIL],
             fail_silently=False
         )
-
 
 class UserViewSet(viewsets.GenericViewSet):
     queryset = User.objects.all()

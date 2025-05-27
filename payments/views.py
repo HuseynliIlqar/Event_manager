@@ -4,10 +4,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from .models import Payment
 import uuid
+from .serializers import PaymentSerializer
 
 class PaymentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-    
+    queryset = Payment.objects.all()  # basename üçün lazım
+    serializer_class = PaymentSerializer
+
     def get_queryset(self):
         return Payment.objects.filter(user=self.request.user)
     

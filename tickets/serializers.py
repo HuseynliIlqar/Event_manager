@@ -14,6 +14,7 @@ class EventSerializer(serializers.ModelSerializer):
         write_only=True,
         source='category'
     )
+    is_active = serializers.BooleanField(default=True)
 
     class Meta:
         model = Event

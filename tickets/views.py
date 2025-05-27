@@ -103,6 +103,7 @@ class EventViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             serializer.save(organizer=request.user)
+            print(serializer.data)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -267,7 +268,6 @@ class TicketCheckViewSet(viewsets.ViewSet):
 
         serializer = TicketSerializer(ticket)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
 
 class TicketPurchaseAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
