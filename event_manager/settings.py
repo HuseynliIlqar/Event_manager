@@ -167,6 +167,6 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 # Payment System Settings
-PAYMENT_SYSTEM_URL = 'http://localhost:8001'  
-PAYMENT_SYSTEM_API_KEY = 'your-api-key-here'  
-EVENT_SERVICE_URL = 'http://localhost:8000'  
+PAYMENT_SYSTEM_URL = "odenısın urlı"
+PAYMENT_SYSTEM_API_KEY = 'callback-lərdə yoxlamaq üçün istifadə olunan API açarı'
+EVENT_SERVICE_URL = "http://127.0.0.1:8000"

@@ -33,8 +33,7 @@ class TicketSerializer(serializers.ModelSerializer):
         model = Ticket
         fields = [
             'ticket_id', 'event', 'event_id', 'ticket_type', 'ticket_type_display',
-            'seller', 'customer', 'price', 'currency', 'seat_number',
-            'is_paid', 'is_used', 'created_at'
+            'seller', 'customer', 'price', 'currency', 'seat_number', 'created_at'
         ]
         read_only_fields = ('ticket_id', 'created_at')
 

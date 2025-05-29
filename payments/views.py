@@ -74,7 +74,7 @@ def initiate_payment(request):
 
     # Xarici ödəniş sisteminə yalnız lazımi məlumatları göndəririk
     payment_data = {
-        "price": total_price,
+        "amount": total_price,
         "callback_url": callback_url
     }
 
