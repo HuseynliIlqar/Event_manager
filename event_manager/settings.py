@@ -20,7 +20,6 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'modeltranslation',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -28,15 +27,15 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    # Local apps
-    'auth_system',
-    'tickets',
-
     # Third-party libraries
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+
+    # Local apps
+    'auth_system',
+    'tickets.apps.TicketsConfig',
     'payments',
 ]
 
@@ -44,7 +43,6 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -133,6 +131,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
+# Language settings
 LANGUAGE_CODE = 'az'
 LANGUAGES = (
     ('az', 'Azərbaycan'),
@@ -141,10 +140,12 @@ LANGUAGES = (
 )
 
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
+
+# Modeltranslation settings
+MODELTRANSLATION_DEFAULT_LANGUAGE = 'az'
+MODELTRANSLATION_LANGUAGES = ('az', 'en', 'ru')
 
 
 # Static files (CSS, JavaScript, Images)
@@ -157,5 +158,15 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-MODELTRANSLATION_DEFAULT_LANGUAGE = 'az'
-MODELTRANSLATION_LANGUAGES = ('az', 'en', 'ru')
+# CORS Settings
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8000",
+    "http://localhost:8001",
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+# Payment System Settings
+PAYMENT_SYSTEM_URL = 'http://localhost:8001'  
+PAYMENT_SYSTEM_API_KEY = 'your-api-key-here'  
+EVENT_SERVICE_URL = 'http://localhost:8000'  

@@ -16,8 +16,8 @@ class EventAdmin(admin.ModelAdmin):
 
 @admin.register(Ticket)
 class TicketAdmin(admin.ModelAdmin):
-    list_display = ('ticket_id', 'event', 'ticket_type', 'seller', 'customer', 'price', 'is_paid', 'is_used', 'created_at')
-    list_filter = ('ticket_type', 'is_paid', 'is_used', 'created_at')
+    list_display = ('ticket_id', 'event', 'ticket_type', 'seller', 'customer', 'price', 'created_at')
+    list_filter = ('ticket_type', 'created_at')
     search_fields = ('ticket_id', 'event__name', 'seller__username', 'customer__username')
     readonly_fields = ('created_at',)
     fieldsets = (
