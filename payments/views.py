@@ -45,6 +45,7 @@ def verify_callback_signature(request):
 def initiate_payment(request):
     ticket_id = request.data.get('ticket_id')
     payment_method = request.data.get('payment_method', 'credit_card')
+    ticket_count = int(request.data.get('ticket_count', 1))  # Default olaraq 1 ticket
 
     try:
         ticket = Ticket.objects.get(ticket_id=ticket_id)
@@ -60,17 +61,21 @@ def initiate_payment(request):
     payment = Payment.objects.create(
         user=request.user,
         ticket=ticket,
+        ticket_count=ticket_count,
         payment_method=payment_method,
         transaction_id=transaction_id
     )
 
-    # Xarici ödəniş sisteminə məlumat göndəririk
+    # Ticket sayına görə ümumi qiyməti hesablayırıq
+    total_price = float(ticket.price) * ticket_count
+    
+    # Prepare callback URL
+    callback_url = f"{settings.BASE_URL}/api/payments/callback/"
+
+    # Xarici ödəniş sisteminə yalnız lazımi məlumatları göndəririk
     payment_data = {
-        "user_id": request.user.id,
-        "event_id": ticket.event.id,
-        "ticket_count": 1,
-        "total_price": float(ticket.price),
-        "payment_reference": transaction_id
+        "price": total_price,
+        "callback_url": callback_url
     }
 
     try:

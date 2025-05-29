@@ -18,6 +18,7 @@ class Payment(models.Model):
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='payments')
     ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name='payments')
+    ticket_count = models.PositiveIntegerField(default=1)  # Ticket sayı
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD)
     status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default='pending')
     transaction_id = models.CharField(max_length=100, unique=True)  # Hər ödəniş üçün unikal identifikator
@@ -35,7 +36,7 @@ class Payment(models.Model):
 
     @property
     def amount(self):
-        return self.ticket.price
+        return self.ticket.price * self.ticket_count
 
     @property
     def currency(self):

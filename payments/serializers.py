@@ -5,7 +5,7 @@ from tickets.models import Ticket
 class PaymentSerializer(serializers.ModelSerializer):
     # Bilet məlumatlarını avtomatik gətirir
     ticket_id = serializers.CharField(source='ticket.ticket_id', read_only=True)
-    amount = serializers.DecimalField(source='ticket.price', max_digits=10, decimal_places=2, read_only=True)
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     currency = serializers.CharField(source='ticket.currency', read_only=True)
 
     class Meta:
@@ -15,6 +15,7 @@ class PaymentSerializer(serializers.ModelSerializer):
             'id',
             'transaction_id',
             'ticket_id',
+            'ticket_count',
             'amount',
             'currency',
             'payment_method',
